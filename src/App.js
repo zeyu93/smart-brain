@@ -8,6 +8,9 @@ import Logo from "./components/Logo/Logo";
 import ImageLinkForm from "./components/ImageLinkForm/ImageLinkForm";
 import Rank from "./components/Rank/Rank";
 import "./App.css";
+import dotenv from "dotenv";
+import axios from "axios";
+dotenv.config();
 
 const particlesOptions = {
   particles: {
@@ -25,13 +28,14 @@ const initialState = {
   input: "",
   imageUrl: "",
   boxes: [],
-  route: "signin",
+  route: "login",
   isSignedIn: false,
   user: {
     id: "",
     name: "",
     email: "",
     entries: 0,
+    pet: "",
     joined: ""
   }
 };
@@ -41,6 +45,26 @@ class App extends Component {
     super();
     this.state = initialState;
   }
+  componentDidMount() {
+    const token = window.sessionStorage.getItem("token");
+
+    if (token) {
+      let axiosConfig = {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      };
+      axios
+        .post(`${process.env.API}/signin`, axiosConfig)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.id) {
+            console.log("sucess");
+          }
+        })
+        .catch(console.log("yoo"));
+    }
+  }
 
   loadUser = data => {
     this.setState({
@@ -49,7 +73,8 @@ class App extends Component {
         name: data.name,
         email: data.email,
         entries: data.entries,
-        joined: data.joined
+        joined: data.joined,
+        pet: data.pet
       }
     });
   };
@@ -59,14 +84,12 @@ class App extends Component {
     const clarifaiFaceArrayData = data.outputs[0].data.regions.map(
       face => face.region_info.bounding_box
     );
-    console.log("array of face data:", clarifaiFaceArrayData);
 
     const image = document.getElementById("inputimage");
     const width = Number(image.width);
     const height = Number(image.height);
 
     let resultArray = clarifaiFaceArrayData.map(face => {
-      console.log("face:", face);
       return {
         leftCol: face.left_col * width,
         topRow: face.top_row * height,
@@ -74,12 +97,11 @@ class App extends Component {
         bottomRow: height - face.bottom_row * height
       };
     });
-    console.log("result", resultArray);
     return resultArray;
   };
 
   displayFaceBox = boxes => {
-    console.log(boxes)
+    console.log(boxes);
     this.setState({ boxes: boxes });
   };
 
@@ -91,7 +113,10 @@ class App extends Component {
     this.setState({ imageUrl: this.state.input });
     fetch("http://localhost:3001/imageurl", {
       method: "post",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": window.sessionStorage.getItem("token")
+      },
       body: JSON.stringify({
         input: this.state.input
       })
@@ -101,7 +126,10 @@ class App extends Component {
         if (response) {
           fetch("http://localhost:3001/image", {
             method: "put",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": window.sessionStorage.getItem("token")
+            },
             body: JSON.stringify({
               id: this.state.user.id
             })
@@ -120,7 +148,7 @@ class App extends Component {
 
   onRouteChange = route => {
     if (route === "signout") {
-      this.setState(initialState);
+      return this.setState(initialState);
     } else if (route === "home") {
       this.setState({ isSignedIn: true });
     }
@@ -128,13 +156,16 @@ class App extends Component {
   };
 
   render() {
-    const { isSignedIn, imageUrl, route, boxes } = this.state;
+    const { isSignedIn, imageUrl, route, boxes, user } = this.state;
+
     return (
       <div className="App">
         <Particles className="particles" params={particlesOptions} />
         <Navigation
           isSignedIn={isSignedIn}
           onRouteChange={this.onRouteChange}
+          user={user}
+          loadUser={this.loadUser}
         />
         {route === "home" ? (
           <div>
